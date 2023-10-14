@@ -55,6 +55,9 @@ impl SwapBlock {
     fn set_end(&mut self, end: usize) {
         self.end = end;
     }
+    fn is_complete(&self) -> bool {
+        self.end != 0
+    }
 }
 
 fn swap(path: &str) {
@@ -84,7 +87,7 @@ fn swap(path: &str) {
         return;
     }
     for swap_block in &swap_blocks {
-        if swap_block.end == 0 {
+        if !swap_block.is_complete() {
             return;
         }
     }
@@ -119,6 +122,5 @@ fn main() {
 
     for entry in &entries {
         swap(entry);
-        //println!("{}", entry);
     }
 }
