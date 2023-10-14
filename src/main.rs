@@ -1,40 +1,33 @@
+use std::env;
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process;
 
 const START: &str = "#SWAP";
 const END: &str = "#SWAPEND";
 
-fn visit_dir(path: &Path) -> io::Result<Vec<String>> {
+fn visit_dir(path: &Path) -> io::Result<Vec<PathBuf>> {
     let entries = fs::read_dir(path)?
         .filter_map(|res| res.ok())
-        .filter_map(|file_path| {
-            if file_path.path().is_dir() {
-                None
-            } else {
-                Some(file_path.file_name())
-            }
-        })
-        .filter_map(|file| file.into_string().ok());
+        .map(|entry| entry.path())
+        .filter(|path| !path.is_dir());
     Ok(entries.collect())
 }
 
-fn visit_dir_recursive(path: &Path) -> io::Result<Vec<String>> {
-    let (dirs, files): (Vec<_>, Vec<_>) = fs::read_dir(path)?
+fn visit_dir_recursive(path: &Path) -> io::Result<Vec<PathBuf>> {
+    let (dirs, mut files): (Vec<_>, Vec<_>) = fs::read_dir(path)?
         .filter_map(|res| res.ok())
         .map(|entry| entry.path())
         .partition(|path| path.is_dir());
-    let dir_files = dirs
+    let mut dir_files = dirs
         .iter()
         .filter_map(|dir| visit_dir_recursive(dir).ok())
-        .flatten();
-    let files = files
-        .iter()
-        .filter_map(|path| path.file_name())
-        .filter_map(|file_name| file_name.to_owned().into_string().ok())
-        .chain(dir_files);
-    Ok(files.collect())
+        .flatten()
+        .collect::<Vec<PathBuf>>();
+    files.append(&mut dir_files);
+    Ok(files)
 }
 
 struct SwapBlock {
@@ -60,10 +53,16 @@ impl SwapBlock {
     }
 }
 
-fn swap(path: &str) {
+fn swap(path: &Path) {
     let Ok(file) = fs::read_to_string(path) else {
         return;
     };
+    let Some(extension) = path.extension() else {
+        return;
+    };
+    if extension != "tf" {
+        return;
+    }
     let mut swap_blocks: Vec<SwapBlock> = vec![];
     let mut lines = vec![];
     for (index, line) in file.lines().enumerate() {
@@ -71,7 +70,7 @@ fn swap(path: &str) {
             swap_blocks
                 .iter_mut()
                 .last()
-                .expect("Not expected to fail")
+                .expect(format!("Not expected to fail in {}", path.to_str().unwrap()).as_str())
                 .set_end(index);
         } else if line.contains(START) {
             let indentation = line
@@ -107,20 +106,34 @@ fn swap(path: &str) {
     fs::write(path, contents).unwrap();
 }
 
-fn main() {
-    let entries = if true {
-        visit_dir_recursive(Path::new(".")).unwrap_or_else(|error| {
-            eprintln!("Error reading directory: {}", error);
-            process::exit(1);
-        })
-    } else {
-        visit_dir(Path::new(".")).unwrap_or_else(|error| {
-            eprintln!("Error reading directory: {}", error);
-            process::exit(1);
-        })
-    };
+const RECURSIVE: &str = "all";
 
-    for entry in &entries {
-        swap(entry);
+fn main() {
+    let mut args = env::args();
+    args.next();
+    let command_option = args.next().unwrap_or(RECURSIVE.to_owned());
+
+    if command_option.as_str() == RECURSIVE {
+        let entries = visit_dir_recursive(Path::new(".")).unwrap_or_else(|error| {
+            eprintln!("Error reading directory: {}", error);
+            process::exit(1);
+        });
+
+        for entry in &entries {
+            swap(entry);
+        }
+    }
+
+    let path = Path::new(&command_option);
+    if path.is_dir() {
+        let entries = visit_dir(Path::new(&command_option)).unwrap_or_else(|error| {
+            eprintln!("Error reading directory: {}", error);
+            process::exit(1);
+        });
+        for entry in &entries {
+            swap(entry);
+        }
+    } else {
+        swap(path);
     }
 }
