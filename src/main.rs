@@ -1,12 +1,24 @@
-use std::env;
 use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 
+use clap::Parser;
+
 const START: &str = "#SWAP";
 const END: &str = "#SWAPEND";
+
+/// Search for SWAPBLOCKS in a file and swap comments.
+#[derive(Debug, Parser)]
+#[clap(author, version, about)]
+struct Cli {
+    /// Path to the file or directory to read
+    path: PathBuf,
+    /// Change every file in directory and subdirectories
+    #[arg(short = 'r', long = "recursive")]
+    is_recursive: bool,
+}
 
 fn visit_dir(path: &Path) -> io::Result<Vec<PathBuf>> {
     let entries = fs::read_dir(path)?
@@ -106,34 +118,25 @@ fn swap(path: &Path) {
     fs::write(path, contents).unwrap();
 }
 
-const RECURSIVE: &str = "all";
-
 fn main() {
-    let mut args = env::args();
-    args.next();
-    let command_option = args.next().unwrap_or(RECURSIVE.to_owned());
+    let args = Cli::parse();
 
-    if command_option.as_str() == RECURSIVE {
-        let entries = visit_dir_recursive(Path::new(".")).unwrap_or_else(|error| {
-            eprintln!("Error reading directory: {}", error);
-            process::exit(1);
-        });
-
-        for entry in &entries {
-            swap(entry);
-        }
-    }
-
-    let path = Path::new(&command_option);
-    if path.is_dir() {
-        let entries = visit_dir(Path::new(&command_option)).unwrap_or_else(|error| {
-            eprintln!("Error reading directory: {}", error);
-            process::exit(1);
-        });
-        for entry in &entries {
-            swap(entry);
+    if args.path.is_dir() {
+        let entries = if args.is_recursive {
+            visit_dir_recursive(Path::new(".")).unwrap_or_else(|error| {
+                eprintln!("Error reading directory: {}", error);
+                process::exit(1);
+            })
+        } else {
+            visit_dir(Path::new(&args.path)).unwrap_or_else(|error| {
+                eprintln!("Error reading directory: {}", error);
+                process::exit(1);
+            })
+        };
+        for entry in entries {
+            swap(&entry);
         }
     } else {
-        swap(path);
+        swap(&args.path);
     }
 }
