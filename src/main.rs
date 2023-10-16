@@ -1,5 +1,5 @@
-use std::fs;
-use std::io::Result;
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Result};
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -68,18 +68,19 @@ impl SwapBlock {
 }
 
 fn swap(path: &Path) {
-    let Ok(file) = fs::read_to_string(path) else {
-        return;
-    };
     let Some(extension) = path.extension() else {
         return;
     };
     if extension != "tf" {
         return;
     }
+    let Ok(file) = File::open(path) else {
+        return;
+    };
+    let file = BufReader::new(file);
     let mut swap_blocks: Vec<SwapBlock> = vec![];
     let mut lines = vec![];
-    for (index, line) in file.lines().enumerate() {
+    for (index, line) in file.lines().filter_map(|line| line.ok()).enumerate() {
         if line.contains(END) {
             swap_blocks
                 .iter_mut()
