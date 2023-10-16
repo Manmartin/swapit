@@ -1,7 +1,6 @@
 use std::fs;
-use std::io;
-use std::path::Path;
-use std::path::PathBuf;
+use std::io::Result;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::Parser;
@@ -20,26 +19,29 @@ struct Cli {
     is_recursive: bool,
 }
 
-fn visit_dir(path: &Path) -> io::Result<Vec<PathBuf>> {
+fn visit_dir(path: &Path, swap_function: fn(&Path)) -> Result<()> {
     let entries = fs::read_dir(path)?
         .filter_map(|res| res.ok())
         .map(|entry| entry.path())
         .filter(|path| !path.is_dir());
-    Ok(entries.collect())
+    for entry in entries {
+        swap_function(&entry);
+    }
+    Ok(())
 }
 
-fn visit_dir_recursive(path: &Path) -> io::Result<Vec<PathBuf>> {
-    let (dirs, mut files): (Vec<_>, Vec<_>) = fs::read_dir(path)?
+fn visit_dir_recursive(path: &Path, swap_function: fn(&Path)) -> Result<()> {
+    let entries = fs::read_dir(path)?
         .filter_map(|res| res.ok())
-        .map(|entry| entry.path())
-        .partition(|path| path.is_dir());
-    let mut dir_files = dirs
-        .iter()
-        .filter_map(|dir| visit_dir_recursive(dir).ok())
-        .flatten()
-        .collect::<Vec<PathBuf>>();
-    files.append(&mut dir_files);
-    Ok(files)
+        .map(|entry| entry.path());
+    for entry in entries {
+        if entry.is_dir() {
+            visit_dir_recursive(&entry, swap_function)?;
+        } else {
+            swap_function(&entry);
+        }
+    }
+    Ok(())
 }
 
 struct SwapBlock {
@@ -122,20 +124,17 @@ fn main() {
     let args = Cli::parse();
 
     if args.path.is_dir() {
-        let entries = if args.is_recursive {
-            visit_dir_recursive(Path::new(".")).unwrap_or_else(|error| {
+        if args.is_recursive {
+            visit_dir_recursive(&args.path, swap).unwrap_or_else(|error| {
                 eprintln!("Error reading directory: {}", error);
                 process::exit(1);
             })
         } else {
-            visit_dir(Path::new(&args.path)).unwrap_or_else(|error| {
+            visit_dir(Path::new(&args.path), swap).unwrap_or_else(|error| {
                 eprintln!("Error reading directory: {}", error);
                 process::exit(1);
             })
         };
-        for entry in entries {
-            swap(&entry);
-        }
     } else {
         swap(&args.path);
     }
