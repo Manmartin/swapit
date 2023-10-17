@@ -13,10 +13,11 @@ const END: &str = "#SWAPEND";
 #[clap(author, version, about)]
 struct Cli {
     /// Path to the file or directory to read
-    path: PathBuf,
+    #[arg(num_args(0..))]
+    paths: Vec<PathBuf>,
     /// Change every file in directory and subdirectories
     #[arg(short = 'r', long = "recursive")]
-    is_recursive: bool,
+    recursive: bool,
 }
 
 fn visit_dir(path: &Path, swap_function: fn(&Path)) -> Result<()> {
@@ -124,19 +125,24 @@ fn swap(path: &Path) {
 fn main() {
     let args = Cli::parse();
 
-    if args.path.is_dir() {
-        if args.is_recursive {
-            visit_dir_recursive(&args.path, swap).unwrap_or_else(|error| {
-                eprintln!("Error reading directory: {}", error);
-                process::exit(1);
-            })
+    if args.paths.len() == 0 {
+        return;
+    }
+    for path in args.paths {
+        if path.is_dir() {
+            if args.recursive {
+                visit_dir_recursive(&path, swap).unwrap_or_else(|error| {
+                    eprintln!("Error reading directory: {}", error);
+                    process::exit(1);
+                })
+            } else {
+                visit_dir(Path::new(&path), swap).unwrap_or_else(|error| {
+                    eprintln!("Error reading directory: {}", error);
+                    process::exit(1);
+                })
+            };
         } else {
-            visit_dir(Path::new(&args.path), swap).unwrap_or_else(|error| {
-                eprintln!("Error reading directory: {}", error);
-                process::exit(1);
-            })
-        };
-    } else {
-        swap(&args.path);
+            swap(&path);
+        }
     }
 }
