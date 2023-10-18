@@ -1,15 +1,26 @@
 //! Definition of input parameters
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 /// Search for SWAPBLOCKS in a file and swap comments.
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 pub struct Cli {
-    /// Path to the file or directory to read
+    #[command(subcommand)]
+    pub command: Option<Subcommands>,
+
+    /// Paths to files or directories to read
+    #[arg(global = true)]
     pub paths: Vec<PathBuf>,
-    /// Change every file in directory and subdirectories
-    #[arg(short = 'r', long = "recursive")]
+
+    /// Apply action to every file in directory and subdirectories
+    #[arg(short = 'r', long = "recursive", global = true)]
     pub recursive: bool,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Subcommands {
+    /// List all Swapblocks
+    List,
 }
