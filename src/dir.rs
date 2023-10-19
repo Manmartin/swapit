@@ -6,7 +6,9 @@ use std::path::Path;
 
 use crate::args::Cli;
 
-pub fn select_visit_method(args: &Cli) -> fn(&Path, fn(&Path)) -> Result<()> {
+type VisitFunction = fn(&Path, fn(&Path)) -> Result<()>;
+
+pub fn select_visit_method(args: &Cli) -> VisitFunction {
     if args.recursive {
         visit_dir_recursive
     } else {

@@ -52,12 +52,12 @@ fn swap(path: &Path) {
     let file = BufReader::new(file);
     let mut swap_blocks: Vec<SwapBlock> = vec![];
     let mut lines = vec![];
-    for (index, line) in file.lines().filter_map(|line| line.ok()).enumerate() {
+    for (index, line) in file.lines().map_while(|line| line.ok()).enumerate() {
         if line.contains(END) {
             swap_blocks
                 .iter_mut()
                 .last()
-                .expect(format!("Not expected to fail in {}", path.to_str().unwrap()).as_str())
+                .expect("Not expected to fail")
                 .set_end(index);
         } else if line.contains(START) {
             let indentation = line
@@ -69,7 +69,7 @@ fn swap(path: &Path) {
         lines.push(line.to_owned());
     }
 
-    if swap_blocks.len() == 0 {
+    if swap_blocks.is_empty() {
         return;
     }
     for swap_block in &swap_blocks {
@@ -106,12 +106,12 @@ fn list(path: &Path) {
     let file = BufReader::new(file);
     let mut swap_blocks: Vec<SwapBlock> = vec![];
     let mut lines = vec![];
-    for (index, line) in file.lines().filter_map(|line| line.ok()).enumerate() {
+    for (index, line) in file.lines().map_while(|line| line.ok()).enumerate() {
         if line.contains(END) {
             swap_blocks
                 .iter_mut()
                 .last()
-                .expect(format!("Not expected to fail in {}", path.to_str().unwrap()).as_str())
+                .expect("Not expected to fail")
                 .set_end(index);
         } else if line.contains(START) {
             let indentation = line
@@ -123,7 +123,7 @@ fn list(path: &Path) {
         lines.push(line.to_owned());
     }
 
-    if swap_blocks.len() == 0 {
+    if swap_blocks.is_empty() {
         return;
     }
     for swap_block in &swap_blocks {
