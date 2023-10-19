@@ -12,14 +12,14 @@ fn main() {
     let action = action::select_action(&args);
     let visit_method = dir::select_visit_method(&args);
 
-    for path in args.paths {
+    for path in &args.paths {
         if path.is_dir() {
-            visit_method(&path, action).unwrap_or_else(|error| {
+            visit_method(&path, action, &args).unwrap_or_else(|error| {
                 eprintln!("Error reading directory: {}", error);
                 process::exit(1);
             });
         } else {
-            action(&path);
+            action(&path, &args);
         }
     }
 }

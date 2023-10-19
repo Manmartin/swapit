@@ -6,7 +6,9 @@ use std::path::Path;
 
 use crate::args::{Cli, Subcommands};
 
-pub fn select_action(args: &Cli) -> fn(&Path) {
+pub type ActionFunction = fn(&Path, &Cli);
+
+pub fn select_action(args: &Cli) -> ActionFunction {
     match args.command {
         Some(Subcommands::List) => list,
         None => swap,
@@ -39,7 +41,7 @@ impl SwapBlock {
     }
 }
 
-fn swap(path: &Path) {
+fn swap(path: &Path, _args: &Cli) {
     let Some(extension) = path.extension() else {
         return;
     };
@@ -93,7 +95,7 @@ fn swap(path: &Path) {
     fs::write(path, contents).unwrap();
 }
 
-fn list(path: &Path) {
+fn list(path: &Path, _args: &Cli) {
     let Some(extension) = path.extension() else {
         return;
     };
