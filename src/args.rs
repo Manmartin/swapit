@@ -23,4 +23,6 @@ pub struct Cli {
 pub enum Subcommands {
     /// List all Swapblocks
     List,
+    /// Remove swapblocks and commented lines
+    Clean,
 }

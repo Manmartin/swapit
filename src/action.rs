@@ -11,6 +11,7 @@ pub type ActionFunction = fn(&Path, &Cli);
 pub fn select_action(args: &Cli) -> ActionFunction {
     match args.command {
         Some(Subcommands::List) => list,
+        Some(Subcommands::Clean) => clean,
         None => swap,
     }
 }
@@ -145,6 +146,60 @@ fn list(path: &Path, _args: &Cli) {
             println!("{}", line);
         }
         println!()
+    }
+
+    let mut contents = lines.join("\n");
+    contents.push('\n');
+    fs::write(path, contents).unwrap();
+}
+
+fn clean(path: &Path, _args: &Cli) {
+    let Some(extension) = path.extension() else {
+        return;
+    };
+    if extension != "tf" {
+        return;
+    }
+    let Ok(file) = File::open(path) else {
+        return;
+    };
+    let file = BufReader::new(file);
+    let mut swap_blocks: Vec<SwapBlock> = vec![];
+    let mut lines = vec![];
+    for (index, line) in file.lines().map_while(|line| line.ok()).enumerate() {
+        if line.contains(END) {
+            swap_blocks
+                .iter_mut()
+                .last()
+                .expect("Not expected to fail")
+                .set_end(index);
+        } else if line.contains(START) {
+            let indentation = line
+                .chars()
+                .position(|c| c == '#')
+                .expect("Not expected to fail");
+            swap_blocks.push(SwapBlock::new(index, indentation));
+        }
+        lines.push(line.to_owned());
+    }
+
+    if swap_blocks.is_empty() {
+        return;
+    }
+    for swap_block in &swap_blocks {
+        if !swap_block.is_complete() {
+            return;
+        }
+    }
+
+    for i in (0..swap_blocks.len()).rev() {
+        lines.remove(swap_blocks[i].end);
+        for j in swap_blocks[i].start + 1..swap_blocks[i].end {
+            if lines[j].contains("# ") {
+                lines.remove(j);
+            }
+        }
+        lines.remove(swap_blocks[i].start);
     }
 
     let mut contents = lines.join("\n");
