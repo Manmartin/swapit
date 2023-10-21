@@ -1,7 +1,7 @@
 //! Definition of actions to apply on a file
 
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
 use crate::args::{Cli, Subcommands};
@@ -12,6 +12,7 @@ pub fn select_action(args: &Cli) -> ActionFunction {
     match args.command {
         Some(Subcommands::List) => list,
         Some(Subcommands::Clean) => clean,
+        Some(Subcommands::Test) => test,
         None => swap,
     }
 }
@@ -205,4 +206,76 @@ fn clean(path: &Path, _args: &Cli) {
     let mut contents = lines.join("\n");
     contents.push('\n');
     fs::write(path, contents).unwrap();
+}
+use std::fs::OpenOptions;
+
+fn test(path: &Path, _args: &Cli) {
+    #[derive(PartialEq, Eq)]
+    enum State {
+        Default,
+        Swap,
+    }
+    let file = OpenOptions::new()
+        .read(true)
+        .open(path)
+        .unwrap_or_else(|e| {
+            eprintln!("Cant open file: {}", e);
+            std::process::exit(0);
+        });
+    let file = BufReader::new(file);
+
+    // TODO: BufWrite
+    let temp_path = format!("{}.swap.temp", path.display());
+    let temp_path = Path::new(&temp_path);
+    let Ok(temp_file) = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(temp_path)
+    else {
+        eprintln!("Cant open file");
+        return;
+    };
+    let mut temp_file = BufWriter::new(temp_file);
+    let mut indentation = 0;
+    let mut state = State::Default;
+    for line in file.lines() {
+        let mut line = line.unwrap();
+        line.push('\n');
+        if state == State::Swap {
+            if line.contains("# ") {
+                temp_file
+                    .write(line.replacen("# ", "", 1).as_bytes())
+                    .expect("Writting error");
+            } else if line.contains(END) {
+                temp_file.write(line.as_bytes()).expect("Writting error");
+                state = State::Default;
+            } else if line.contains(START) {
+                eprintln!("Error in swaps");
+                fs::remove_file(temp_path).unwrap();
+                std::process::exit(1);
+            } else {
+                let second_half = line.split_off(indentation);
+                temp_file
+                    .write(format!("{}# {}", line, second_half).as_bytes())
+                    .expect("Writting error");
+            }
+        } else {
+            if line.contains(START) {
+                indentation = line.chars().position(|c| c == '#').unwrap();
+                temp_file.write(line.as_bytes()).expect("Writting error");
+                state = State::Swap;
+            } else if line.contains(END) {
+                eprintln!("Error in swaps");
+                fs::remove_file(temp_path).unwrap();
+                std::process::exit(1);
+            } else {
+                temp_file.write(line.as_bytes()).expect("Writting error");
+            }
+        }
+    }
+    fs::rename(temp_path, path).unwrap_or_else(|e| {
+        println!("Error renaming file: {}", e);
+        std::process::exit(1);
+    });
 }

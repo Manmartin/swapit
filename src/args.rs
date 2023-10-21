@@ -25,4 +25,6 @@ pub enum Subcommands {
     List,
     /// Remove swapblocks and commented lines
     Clean,
+    /// TEMP
+    Test,
 }
