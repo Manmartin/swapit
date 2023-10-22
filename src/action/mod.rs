@@ -6,6 +6,10 @@ use std::path::Path;
 
 use crate::args::{Cli, Subcommands};
 
+mod utils;
+
+use utils::TempFile;
+
 pub type ActionFunction = fn(&Path, &Cli);
 
 pub fn select_action(args: &Cli) -> ActionFunction {
@@ -224,19 +228,13 @@ fn test(path: &Path, _args: &Cli) {
         });
     let file = BufReader::new(file);
 
-    // TODO: BufWrite
     let temp_path = format!("{}.swap.temp", path.display());
     let temp_path = Path::new(&temp_path);
-    let Ok(temp_file) = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(temp_path)
-    else {
+    let Ok(temp_file) = TempFile::build(temp_path) else {
         eprintln!("Cant open file");
         return;
     };
-    let mut temp_file = BufWriter::new(temp_file);
+    let mut temp_buff = BufWriter::new(temp_file.get_file());
     let mut indentation = 0;
     let mut state = State::Default;
     for line in file.lines() {
@@ -244,11 +242,11 @@ fn test(path: &Path, _args: &Cli) {
         line.push('\n');
         if state == State::Swap {
             if line.contains("# ") {
-                temp_file
+                temp_buff
                     .write(line.replacen("# ", "", 1).as_bytes())
                     .expect("Writting error");
             } else if line.contains(END) {
-                temp_file.write(line.as_bytes()).expect("Writting error");
+                temp_buff.write(line.as_bytes()).expect("Writting error");
                 state = State::Default;
             } else if line.contains(START) {
                 eprintln!("Error in swaps");
@@ -256,21 +254,21 @@ fn test(path: &Path, _args: &Cli) {
                 std::process::exit(1);
             } else {
                 let second_half = line.split_off(indentation);
-                temp_file
+                temp_buff
                     .write(format!("{}# {}", line, second_half).as_bytes())
                     .expect("Writting error");
             }
         } else {
             if line.contains(START) {
                 indentation = line.chars().position(|c| c == '#').unwrap();
-                temp_file.write(line.as_bytes()).expect("Writting error");
+                temp_buff.write(line.as_bytes()).expect("Writting error");
                 state = State::Swap;
             } else if line.contains(END) {
                 eprintln!("Error in swaps");
                 fs::remove_file(temp_path).unwrap();
                 std::process::exit(1);
             } else {
-                temp_file.write(line.as_bytes()).expect("Writting error");
+                temp_buff.write(line.as_bytes()).expect("Writting error");
             }
         }
     }
