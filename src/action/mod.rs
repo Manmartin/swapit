@@ -1,4 +1,5 @@
 //! Definition of actions to apply on a file
+#![allow(unused)]
 
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -212,6 +213,32 @@ fn clean(path: &Path, _args: &Cli) {
     fs::write(path, contents).unwrap();
 }
 use std::fs::OpenOptions;
+
+enum State {
+    Reading,
+    Swaping { indentation: usize },
+    Failed,
+}
+
+enum Event {
+    Swap,
+    Swapend,
+}
+
+impl State {
+    fn next(self, event: Event, line: &str) -> State {
+        match (self, event) {
+            (State::Reading, Event::Swap) => {
+                let Some(indentation) = line.chars().position(|c| c == '#') else {
+                    return State::Failed;
+                };
+                State::Swaping { indentation }
+            }
+            (State::Swaping { .. }, Event::Swapend) => State::Reading,
+            (_, _) => State::Failed,
+        }
+    }
+}
 
 fn test(path: &Path, _args: &Cli) {
     #[derive(PartialEq, Eq)]
