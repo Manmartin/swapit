@@ -1,6 +1,7 @@
 //! Definition of actions to apply on a file
 #![allow(unused)]
 
+use phf::phf_map;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
@@ -24,6 +25,10 @@ pub fn select_action(args: &Cli) -> ActionFunction {
 
 const START: &str = "#SWAP";
 const END: &str = "#SWAPEND";
+const COMMENT_STYLES: phf::Map<&'static str, &'static str> = phf_map! {
+    "tf" => "#",
+    "rs" => "//",
+};
 
 struct SwapBlock {
     start: usize,
@@ -246,6 +251,7 @@ fn test(path: &Path, _args: &Cli) {
         Default,
         Swap,
     }
+
     let file = OpenOptions::new()
         .read(true)
         .open(path)
