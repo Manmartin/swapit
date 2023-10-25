@@ -6,6 +6,14 @@ pub struct TempFile<'a> {
     path: &'a Path,
 }
 
+pub fn get_comment_style(extension: &str) -> Option<&'static str> {
+    match extension {
+        "tf" => Some("# "),
+        "rs" => Some("// "),
+        _ => None,
+    }
+}
+
 impl<'a> TempFile<'a> {
     /// Create a new temp file from indicated path
     pub fn build(path: &'a Path) -> Result<Self> {

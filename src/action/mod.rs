@@ -54,12 +54,16 @@ impl SwapBlock {
 }
 
 fn swap(path: &Path, _args: &Cli) {
-    let Some(extension) = path.extension() else {
+    let Some(extension) = path.extension().and_then(|ex| ex.to_str()) else {
         return;
     };
-    if extension != "tf" {
+    let Some(comment) = utils::get_comment_style(extension) else {
         return;
-    }
+    };
+    let Some(comment_first_char) = comment.chars().next() else {
+        return;
+    };
+
     let Ok(file) = File::open(path) else {
         return;
     };
@@ -76,7 +80,7 @@ fn swap(path: &Path, _args: &Cli) {
         } else if line.contains(START) {
             let indentation = line
                 .chars()
-                .position(|c| c == '#')
+                .position(|c| c == comment_first_char)
                 .expect("Not expected to fail");
             swap_blocks.push(SwapBlock::new(index, indentation));
         }
@@ -94,11 +98,11 @@ fn swap(path: &Path, _args: &Cli) {
 
     for i in 0..swap_blocks.len() {
         for line in &mut lines[swap_blocks[i].start + 1..swap_blocks[i].end] {
-            if line.contains("# ") {
-                *line = line.replacen("# ", "", 1);
+            if line.contains(comment) {
+                *line = line.replacen(comment, "", 1);
             } else {
                 let second_half = line.split_off(swap_blocks[i].indentation);
-                *line = format!("{line}# {second_half}");
+                *line = format!("{line}{comment}{second_half}");
             }
         }
     }
